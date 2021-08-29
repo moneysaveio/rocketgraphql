@@ -1,15 +1,17 @@
 import { Form, Input, Button, Checkbox } from 'antd';
 import { Row } from "antd";
 import  axios from "axios";
+import { useAppDispatch } from '../app/hooks';
+// import { addUserToState } from '../features/auth/userSlice';
 
 const Login = () => {
+  const dispatch = useAppDispatch();
   const onFinish = async (values: any) => {
     // post to API here
     const API_URL = `${process.env.REACT_APP_API_ENDPOINT}/signup`;
     const response = await axios.post(API_URL, values);
-    console.log('Success:', values, API_URL, response);
-  };
 
+  };
   const onFinishFailed = (errorInfo: any) => {
     console.log('Failed:', errorInfo);
   };

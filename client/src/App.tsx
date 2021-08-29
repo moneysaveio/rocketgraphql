@@ -8,6 +8,8 @@ import {
 } from "react-router-dom";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Dashboard from "./pages/Dashboard";
+import Project from './pages/Project';
 require('dotenv').config();
 
 function App() {
@@ -16,6 +18,8 @@ function App() {
         <Switch>
           <Route path="/login" component={Login} />
           <Route path="/signup" component={Signup} />
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/project/:projectId" component={Project} />
         </Switch>
     </Router>
   );

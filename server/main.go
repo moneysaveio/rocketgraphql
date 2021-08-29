@@ -53,7 +53,7 @@ func main() {
 	// for more ideas, see: https://developer.github.com/v3/#cross-origin-resource-sharing
 	r.Use(cors.Handler(cors.Options{
 		// AllowedOrigins:   []string{"https://foo.com"}, // Use this to allow specific origin hosts
-		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedOrigins: []string{"https://*", "http://*", "ws://*"},
 		// AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
@@ -82,66 +82,37 @@ func main() {
 			_, claims, _ := jwtauth.FromContext(r.Context())
 			w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
 		})
+		// r.Route("/api/project/{projectId}", func(r chi.Router) {
+		// 	// _, claims, _ := jwtauth.FromContext(r.Context())
+		// 	// w.Write([]byte(fmt.Sprintf("protected area. hi %v", claims["user_id"])))
+		// 	r.Use(routes.ProjectCtx)
+		// 	r.Get("/", routes.ChiProjectGetHandler)
+		// })
+
+		// RESTy routes for "projects" resource
+		r.Route("/api/projects", func(r chi.Router) {
+			r.With(paginate).Get("/", routes.ListProjects)
+
+			r.Route("/{projectId}", func(r chi.Router) {
+				r.Use(routes.ProjectCtx)      // Load the *Project on the request context
+				r.Get("/", routes.GetProject) // GET /projects/123
+			})
+			// GET /articles/whats-up
+			// r.With(routes.ProjectCtx).Get("/{articleSlug:[a-z-]+}", GetArticle)
+		})
 	})
 	http.ListenAndServe(":5000", r)
 	pretty.Println("Server is ready to handle requests at 5000")
-	/*
-		flag.StringVar(&listenAddr, "listen-addr", ":5000", "server listen address")
-		flag.Parse()
-		fileServer := http.FileServer(http.Dir("./build"))
+}
 
-		logger := log.New(os.Stdout, "http: ", log.LstdFlags)
-		logger.Println("Server is starting...")
-		initDB()
-
-		// Insert the middleware
-		router := http.NewServeMux()
-		router.Handle("/", index())
-		router.Handle("/healthz", healthz())
-		router.Handle("/build", fileServer)
-		router.Handle("/api/signup/", routes.HandleSignup(DB))
-		nextRequestID := func() string {
-			return fmt.Sprintf("%d", time.Now().UnixNano())
-		}
-
-		handler := cors.Default().Handler(router)
-		server := &http.Server{
-			Addr:         listenAddr,
-			Handler:      tracing(nextRequestID)(logging(logger)(handler)),
-			ErrorLog:     logger,
-			ReadTimeout:  5 * time.Second,
-			WriteTimeout: 10 * time.Second,
-			IdleTimeout:  15 * time.Second,
-		}
-
-		done := make(chan bool)
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, os.Interrupt)
-
-		go func() {
-			<-quit
-			logger.Println("Server is shutting down...")
-			atomic.StoreInt32(&healthy, 0)
-
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			server.SetKeepAlivesEnabled(false)
-			if err := server.Shutdown(ctx); err != nil {
-				logger.Fatalf("Could not gracefully shutdown the server: %v\n", err)
-			}
-			close(done)
-		}()
-
-		logger.Println("Server is ready to handle requests at", listenAddr)
-		atomic.StoreInt32(&healthy, 1)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("Could not listen on %s: %v\n", listenAddr, err)
-		}
-
-		<-done
-		logger.Println("Server stopped")
-	*/
+// paginate is a stub, but very possible to implement middleware logic
+// to handle the request params for handling a paginated request.
+func paginate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// just a stub.. some ideas are to look at URL query params for something like
+		// the page number, or the limit, and send a query cursor down the chain
+		next.ServeHTTP(w, r)
+	})
 }
 
 func initDB() {

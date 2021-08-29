@@ -1,8 +1,16 @@
-import { Form, Input, Button } from 'antd';
+import { Form, Input, Button, Descriptions } from 'antd';
 import { Row } from "antd";
 import  axios from "axios";
+import { useState } from 'react';
+import { useHistory } from 'react-router';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
 
 const Signup = () => {
+  const history = useHistory();
+  const [user, setUser] = useState(null);
+  const dispatch = useAppDispatch();
+  const userFromStore = useAppSelector((state: any) => state.user.value)
+
   const onFinish = (values: any) => {
     // post to API here
     const API_URL = `${process.env.REACT_APP_API_ENDPOINT}/signup`;
@@ -13,7 +21,17 @@ const Signup = () => {
             // See: http://bit.ly/text-json
             'Content-Type': 'application/json',
         }
-    }).then(response => console.log(response))
+    }).then(response => {
+      console.log("bare response:", response);
+      dispatch({
+        type: "user/set",
+        payload: response.data.Email
+      })
+      console.log('Successfully added user to state:', userFromStore);
+      setUser(userFromStore);
+      localStorage.setItem('user', JSON.stringify(response.data));
+      history.push("/dashboard");
+    })
     console.log('Success:', values, API_URL);
   };
 
@@ -49,7 +67,7 @@ const Signup = () => {
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" id="register-button">
             Submit
             </Button>
         </Form.Item>
@@ -59,3 +77,7 @@ const Signup = () => {
 };
 
 export default Signup;
+
+function userState(arg0: null): [any, any] {
+  throw new Error('Function not implemented.');
+}

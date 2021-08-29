@@ -1,11 +1,13 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/go-chi/render"
 	"github.com/kr/pretty"
@@ -24,6 +26,17 @@ import (
 var users = []*User{
 	{ID: "100", Email: "Peter", Password: "Peter"},
 	{ID: "200", Email: "Julia", Password: "Peter"},
+}
+
+// Projects fixture data
+var projects = []*Project{
+	{
+		Owner:            "1",
+		Id:               "1",
+		ProjectName:      "My first Project",
+		HasuraConsoleURL: "http://3.22.214.239:8080/console",
+		PostgresURL:      "postgresql://market_data_access:1234@3.22.214.239:5432/market_data",
+	},
 }
 
 type UserPayload struct {
@@ -53,6 +66,14 @@ type User struct {
 	Password string
 }
 
+type Project struct {
+	Id               string
+	Owner            string
+	ProjectName      string
+	HasuraConsoleURL string
+	PostgresURL      string
+}
+
 // Create a struct that models the structure of a user, both in the request body, and in the DB
 type Credentials struct {
 	Username string
@@ -71,6 +92,11 @@ type SignupResponse struct {
 	Elapsed int
 }
 
+type ProjectResponse struct {
+	*Project
+	Elapsed int
+}
+
 func NewUserCreatedResponse(user *User, token string) *SignupResponse {
 	resp := &SignupResponse{
 		User:  user,
@@ -78,6 +104,21 @@ func NewUserCreatedResponse(user *User, token string) *SignupResponse {
 	}
 
 	return resp
+}
+
+func GetProjectResponse(project *Project) *ProjectResponse {
+	resp := &ProjectResponse{
+		Project: project,
+	}
+	return resp
+}
+
+func ProjectListResponse(projects []*Project) []render.Renderer {
+	list := []render.Renderer{}
+	for _, project := range projects {
+		list = append(list, GetProjectResponse(project))
+	}
+	return list
 }
 
 func (u *SignupRequest) Bind(r *http.Request) error {
@@ -124,16 +165,71 @@ func ErrInvalidRequest(err error) render.Renderer {
 	}
 }
 
+func ErrRender(err error) render.Renderer {
+	return &ErrResponse{
+		Err:            err,
+		HTTPStatusCode: 422,
+		StatusText:     "Error rendering response.",
+		ErrorText:      err.Error(),
+	}
+}
+
 func dbNewUser(user *User) (string, error) {
 	user.ID = fmt.Sprintf("%d", rand.Intn(100)+10)
 	users = append(users, user)
 	return user.ID, nil
 }
 
+func dbGetProject(projectId string) (*Project, error) {
+	return projects[0], nil
+}
+
+func ProjectCtx(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// _, claims, _ := jwtauth.FromContext(r.Context())
+		projectId := chi.URLParam(r, "projectId")
+		project, err := dbGetProject(projectId)
+		if err != nil {
+			http.Error(w, http.StatusText(404), 404)
+			return
+		}
+		ctx := context.WithValue(r.Context(), "project", project)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (rd *SignupResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	// Pre-processing before a response is marshalled and sent across the wire
 	rd.Elapsed = 10
 	return nil
+}
+func (rd *ProjectResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	// Pre-processing before a response is marshalled and sent across the wire
+	rd.Elapsed = 10
+	return nil
+}
+
+func ListProjects(w http.ResponseWriter, r *http.Request) {
+	if err := render.RenderList(w, r, ProjectListResponse(projects)); err != nil {
+		render.Render(w, r, ErrRender(err))
+		return
+	}
+}
+
+// GetProject returns the specific Project. You'll notice it just
+// fetches the Project right off the context, as its understood that
+// if we made it this far, the Project must be on the context. In case
+// its not due to a bug, then it will panic, and our Recoverer will save us.
+func GetProject(w http.ResponseWriter, r *http.Request) {
+	// Assume if we've reach this far, we can access the project
+	// context because this handler is a child of the ProjectCtx
+	// middleware. The worst case, the recoverer middleware will save us.
+	project := r.Context().Value("project").(*Project)
+
+	if err := render.Render(w, r, GetProjectResponse(project)); err != nil {
+		render.Render(w, r, ErrRender(err))
+		return
+	}
 }
 
 func ChiSignupHandler(w http.ResponseWriter, r *http.Request) {

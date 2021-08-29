@@ -1,20 +1,16 @@
-import puppeteer from "puppeteer";
+const { webkit } = require('playwright');
 
-describe("App.js", () => {
-  let browser : any;
-  let page : any;
+(async () => {
+  const browser = await webkit.launch();
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
-  beforeAll(async () => {
-    browser = await puppeteer.launch();
-    page = await browser.newPage();
+  // Log and continue all network requests
+  page.route('**', route => {
+    console.log(route.request().url());
+    route.continue();
   });
 
-  it("contains the welcome text", async () => {
-    await page.goto("http://localhost:5000/signup");
-    await page.waitForSelector("#login-form");
-    // const text = await page.$eval(".App-welcome-text", (e) => e.textContent);
-    // expect(text).toContain("Edit src/App.js and save to reload.");
-  });
-
-  afterAll(() => browser.close());
-});
+  await page.goto('http://todomvc.com');
+  await browser.close();
+})();

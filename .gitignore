@@ -54,4 +54,5 @@ packages/react-devtools-scheduling-profiler/dist
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+server/tmp
 
